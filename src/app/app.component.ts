@@ -16,7 +16,7 @@ import {
       svgClasses: "",
     }),
   ],
-  styleUrls: ["./app.component.css"],
+  styleUrl: "./app.component.css",
   template: `
     <div class="demo">
       <h2>Spartan Tooltip — Viewport Edge Bug</h2>

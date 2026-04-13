@@ -1,0 +1,77 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f5f5f5;
+}
+
+/* Tooltip content styling (mimics shadcn/ui tooltip) */
+.tooltip-content {
+  background: #18181b;
+  color: #fafafa;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 12px;
+  border-radius: 6px;
+  z-index: 50;
+  width: fit-content;
+  animation: fadeIn 150ms ease-out;
+}
+
+/* Arrow styling */
+.tooltip-arrow {
+  display: block;
+  width: 10px;
+  height: 10px;
+  background: #18181b;
+  fill: #18181b;
+}
+
+.tooltip-arrow svg {
+  display: block;
+}
+
+/* Arrow position classes based on data-side */
+.arrow-top {
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - 5px);
+  transform: translateY(100%);
+}
+
+.arrow-bottom {
+  position: absolute;
+  top: -10px;
+  left: calc(50% - 5px);
+  transform: rotate(180deg);
+}
+
+.arrow-left {
+  position: absolute;
+  right: -10px;
+  top: calc(50% - 5px);
+  transform: rotate(-90deg);
+}
+
+.arrow-right {
+  position: absolute;
+  left: -10px;
+  top: calc(50% - 5px);
+  transform: rotate(90deg);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

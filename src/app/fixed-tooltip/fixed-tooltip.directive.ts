@@ -1,0 +1,334 @@
+/**
+ * Fixed BrnTooltip with viewport-aware auto-flip positioning.
+ * This is the exact code from PR https://github.com/spartan-ng/spartan/pull/1316
+ * with only the selector changed to [fixedTooltip] for side-by-side comparison.
+ */
+import {
+  ConnectedPosition,
+  FlexibleConnectedPositionStrategy,
+  Overlay,
+  OverlayPositionBuilder,
+  type OverlayRef,
+} from "@angular/cdk/overlay";
+import { ComponentPortal } from "@angular/cdk/portal";
+import { DOCUMENT } from "@angular/common";
+import {
+  afterNextRender,
+  booleanAttribute,
+  type ComponentRef,
+  computed,
+  DestroyRef,
+  Directive,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  input,
+  linkedSignal,
+  numberAttribute,
+  output,
+  Renderer2,
+  runInInjectionContext,
+  type TemplateRef,
+} from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { Directionality } from "@angular/cdk/bidi";
+import { of, Subject, timer } from "rxjs";
+import { map, switchMap, take } from "rxjs/operators";
+import {
+  BrnTooltipContent,
+  type BrnTooltipType,
+  injectBrnTooltipDefaultOptions,
+} from "@spartan-ng/brain/tooltip";
+import {
+  BRN_TOOLTIP_FALLBACK_POSITIONS,
+  BRN_TOOLTIP_POSITIONS_MAP,
+  BrnTooltipPosition,
+  resolveTooltipPosition,
+} from "./brn-tooltip-position";
+
+interface DelayConfig {
+  isShow: boolean;
+  delay: number;
+}
+
+@Directive({ selector: "[fixedTooltip]", exportAs: "fixedTooltip" })
+export class FixedTooltipDirective {
+  private readonly _config = injectBrnTooltipDefaultOptions();
+  private readonly _destroyRef = inject(DestroyRef);
+  private readonly _document = inject(DOCUMENT);
+  private readonly _elementRef = inject(ElementRef<HTMLElement>);
+  private readonly _injector = inject(Injector);
+  private readonly _overlay = inject(Overlay);
+  private readonly _overlayPositionBuilder = inject(OverlayPositionBuilder);
+  private readonly _renderer = inject(Renderer2);
+  private readonly _dir = inject(Directionality);
+
+  private _tooltipHovered = false;
+  private _listenersRefs: (() => void)[] = [];
+  private _delaySubject: Subject<DelayConfig> | undefined = undefined;
+  private _componentRef: ComponentRef<BrnTooltipContent> | undefined =
+    undefined;
+  private _overlayRef: OverlayRef | undefined = undefined;
+  private _ariaEffectRef: ReturnType<typeof effect> | undefined = undefined;
+
+  public readonly tooltipDisabled = input<boolean, boolean>(false, {
+    transform: booleanAttribute,
+  });
+  public readonly mutableTooltipDisabled = linkedSignal(this.tooltipDisabled);
+  public readonly position = input<BrnTooltipPosition>(
+    this._config.position ?? "top",
+  );
+  public readonly fixedTooltip = input<BrnTooltipType>(null);
+  public readonly showDelay = input<number, number>(this._config.showDelay, {
+    transform: numberAttribute,
+  });
+  public readonly hideDelay = input<number, number>(this._config.hideDelay, {
+    transform: numberAttribute,
+  });
+
+  public readonly show = output<void>();
+  public readonly hide = output<void>();
+
+  private readonly _tooltipText = computed<string | TemplateRef<void>>(() => {
+    let tooltipText = this.fixedTooltip();
+    if (!tooltipText) {
+      return "";
+    } else if (typeof tooltipText === "string") {
+      tooltipText = tooltipText.trim();
+    }
+    return tooltipText;
+  });
+
+  constructor() {
+    afterNextRender(() => {
+      this._overlayRef = this._overlay.create({
+        direction: this._dir,
+        positionStrategy: this._buildPositionStrategy(),
+      });
+
+      this._dir.change
+        .pipe(takeUntilDestroyed(this._destroyRef))
+        .subscribe(() => {
+          if (this._overlayRef) {
+            this._updatePosition();
+            if (this._overlayRef.hasAttached()) {
+              this._overlayRef.updatePosition();
+            }
+          }
+        });
+
+      runInInjectionContext(this._injector, () => {
+        if (!this._overlayRef) return;
+        this._setupDelayMechanism();
+        this._cleanupTriggerEvents();
+        this._initTriggers();
+        this._listenersRefs = [
+          ...this._listenersRefs,
+          this._renderer.listen(
+            this._overlayRef.hostElement,
+            "mouseenter",
+            () => (this._tooltipHovered = true),
+          ),
+          this._renderer.listen(
+            this._overlayRef.hostElement,
+            "mouseleave",
+            () => {
+              this._tooltipHovered = false;
+              this.delay(false, this.hideDelay());
+            },
+          ),
+        ];
+      });
+    });
+
+    this._destroyRef.onDestroy(() => {
+      this._clearAriaDescribedBy();
+      this._delaySubject?.complete();
+      this._cleanupTriggerEvents();
+      this._overlayRef?.dispose();
+    });
+  }
+
+  private _updatePosition(): void {
+    const strategy = this._overlayRef?.getConfig()
+      .positionStrategy as FlexibleConnectedPositionStrategy;
+    if (strategy) {
+      strategy.withPositions(this._getAllPositions());
+    }
+  }
+
+  private _buildPositionStrategy() {
+    return this._overlayPositionBuilder
+      .flexibleConnectedTo(this._elementRef)
+      .withPositions(this._getAllPositions())
+      .withViewportMargin(8);
+  }
+
+  private _getAllPositions(): ConnectedPosition[] {
+    const preferred = this.position();
+    return [preferred, ...BRN_TOOLTIP_FALLBACK_POSITIONS[preferred]].map(
+      (pos) => this._getAdjustedPositionFor(pos),
+    );
+  }
+
+  private _getAdjustedPositionFor(pos: BrnTooltipPosition): ConnectedPosition {
+    const position = BRN_TOOLTIP_POSITIONS_MAP[pos];
+    const isLtr = this._dir.value !== "rtl";
+    return {
+      ...position,
+      offsetX:
+        position.offsetX != null
+          ? isLtr
+            ? position.offsetX
+            : -position.offsetX
+          : undefined,
+    };
+  }
+
+  private _initTriggers() {
+    this._initScrollListener();
+    this._initHoverListeners();
+  }
+
+  private _initHoverListeners(): void {
+    this._listenersRefs = [
+      ...this._listenersRefs,
+      this._renderer.listen(this._elementRef.nativeElement, "mouseenter", () =>
+        this.delay(true, this.showDelay()),
+      ),
+      this._renderer.listen(this._elementRef.nativeElement, "mouseleave", () =>
+        this.delay(false, this.hideDelay()),
+      ),
+      this._renderer.listen(this._elementRef.nativeElement, "focus", () =>
+        this.delay(true, this.showDelay()),
+      ),
+      this._renderer.listen(this._elementRef.nativeElement, "blur", () =>
+        this.delay(false, this.hideDelay()),
+      ),
+    ];
+  }
+
+  private _initScrollListener(): void {
+    this._listenersRefs = [
+      ...this._listenersRefs,
+      this._renderer.listen(this._document.defaultView, "scroll", () =>
+        this._hide(),
+      ),
+    ];
+  }
+
+  private _cleanupTriggerEvents(): void {
+    for (const eventRef of this._listenersRefs) {
+      eventRef();
+    }
+    this._listenersRefs = [];
+  }
+
+  private delay(isShow: boolean, delay = -1): void {
+    this._delaySubject?.next({ isShow, delay });
+  }
+
+  private _setupDelayMechanism(): void {
+    this._delaySubject?.complete();
+    this._delaySubject = new Subject<DelayConfig>();
+    this._delaySubject
+      .pipe(
+        switchMap((config) =>
+          config.delay < 0
+            ? of(config)
+            : timer(config.delay).pipe(map(() => config)),
+        ),
+        takeUntilDestroyed(this._destroyRef),
+      )
+      .subscribe((config) => {
+        if (config.isShow) {
+          this._show();
+        } else {
+          this._hide();
+        }
+      });
+  }
+
+  private _show(): void {
+    if (
+      this._componentRef ||
+      !this._tooltipText() ||
+      this.mutableTooltipDisabled()
+    ) {
+      return;
+    }
+
+    const tooltipPortal = new ComponentPortal(BrnTooltipContent);
+    this._componentRef = this._overlayRef?.attach(tooltipPortal);
+    this._componentRef?.onDestroy(() => {
+      this._componentRef = undefined;
+    });
+    this._componentRef?.instance.state.set("opened");
+    this._componentRef?.instance.setProps(
+      this._tooltipText(),
+      this.position(),
+      this._config.tooltipContentClasses,
+      this._config.arrowClasses(this.position()),
+      this._config.svgClasses,
+    );
+
+    // When the CDK flips the tooltip to a fallback position, update the arrow
+    // direction and CSS classes so they match the actual rendered side.
+    const strategy = this._overlayRef?.getConfig().positionStrategy as
+      | FlexibleConnectedPositionStrategy
+      | undefined;
+    if (strategy && this._componentRef) {
+      const compRef = this._componentRef;
+      strategy.positionChanges
+        .pipe(take(1), takeUntilDestroyed(this._destroyRef))
+        .subscribe((change) => {
+          const resolved = resolveTooltipPosition(change.connectionPair);
+          if (resolved !== this.position()) {
+            compRef.instance.setProps(
+              null,
+              resolved,
+              this._config.tooltipContentClasses,
+              this._config.arrowClasses(resolved),
+              this._config.svgClasses,
+            );
+          }
+        });
+    }
+
+    runInInjectionContext(this._injector, () => {
+      this._ariaEffectRef = effect(() => {
+        const tooltipId = this._componentRef?.instance.id();
+        if (tooltipId) {
+          this._renderer.setAttribute(
+            this._elementRef.nativeElement,
+            "aria-describedby",
+            tooltipId,
+          );
+          this._ariaEffectRef?.destroy();
+          this._ariaEffectRef = undefined;
+        }
+      });
+    });
+    this.show.emit();
+  }
+
+  private _hide(): void {
+    if (!this._componentRef || this._tooltipHovered) return;
+    this._clearAriaDescribedBy();
+    this._renderer.removeAttribute(
+      this._elementRef.nativeElement,
+      "aria-describedby",
+    );
+    this._componentRef.instance.state.set("closed");
+    this.hide.emit();
+    this._overlayRef?.detach();
+  }
+
+  private _clearAriaDescribedBy(): void {
+    if (this._ariaEffectRef) {
+      this._ariaEffectRef.destroy();
+      this._ariaEffectRef = undefined;
+    }
+  }
+}

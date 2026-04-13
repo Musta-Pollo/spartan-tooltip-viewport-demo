@@ -3,10 +3,11 @@ import {
   BrnTooltipImports,
   provideBrnTooltipDefaultOptions,
 } from "@spartan-ng/brain/tooltip";
+import { FixedTooltipDirective } from "./fixed-tooltip/fixed-tooltip.directive";
 
 @Component({
   selector: "app-root",
-  imports: [BrnTooltipImports],
+  imports: [BrnTooltipImports, FixedTooltipDirective],
   providers: [
     provideBrnTooltipDefaultOptions({
       showDelay: 100,
@@ -18,86 +19,89 @@ import {
   ],
   styleUrl: "./app.component.css",
   template: `
-    <div class="demo">
-      <h2>Spartan Tooltip — Viewport Edge Bug</h2>
-      <p class="description">
-        <code>BrnTooltip</code> uses a single CDK overlay position with no
-        fallbacks. When the trigger is near a viewport edge, the tooltip clips
-        off-screen instead of flipping.
-      </p>
-
-      <!-- TOP EDGE: tooltip should flip to bottom but clips instead -->
-      <section class="edge-case top-edge">
-        <span class="label"
-          >Top edge (position="top") — tooltip clips off viewport:</span
-        >
-        <div class="button-row">
-          <button
-            brnTooltip="I should flip to bottom but I clip off-screen"
-            position="top"
-          >
-            Hover me (top edge)
-          </button>
-          <button
-            brnTooltip="Same issue here — no fallback positions"
-            position="top"
-          >
-            Hover me too
-          </button>
+    <div class="layout">
+      <!-- BEFORE: original BrnTooltip (clips) -->
+      <div class="panel before">
+        <div class="panel-header">
+          <h2>Before (current BrnTooltip)</h2>
+          <p>Single CDK position, no fallbacks. Tooltip clips off-screen.</p>
         </div>
-      </section>
-
-      <!-- BOTTOM EDGE -->
-      <section class="edge-case bottom-edge">
-        <span class="label"
-          >Bottom edge (position="bottom") — tooltip clips off viewport:</span
-        >
-        <div class="button-row">
-          <button
-            brnTooltip="I should flip to top but I clip off-screen"
-            position="bottom"
-          >
-            Hover me (bottom edge)
-          </button>
+        <div class="panel-body">
+          <div class="edge top-edge">
+            <button
+              brnTooltip="I should flip to bottom but I clip off-screen"
+              position="top"
+            >
+              Hover me (top)
+            </button>
+          </div>
+          <div class="edge bottom-edge">
+            <button
+              brnTooltip="I should flip to top but I clip off-screen"
+              position="bottom"
+            >
+              Hover me (bottom)
+            </button>
+          </div>
+          <div class="edge left-edge">
+            <button brnTooltip="I should flip to right" position="left">
+              Left
+            </button>
+          </div>
+          <div class="edge right-edge">
+            <button brnTooltip="I should flip to left" position="right">
+              Right
+            </button>
+          </div>
+          <div class="center-buttons">
+            <span class="hint">Center (works fine):</span>
+            <button brnTooltip="Top tooltip" position="top">Top</button>
+            <button brnTooltip="Bottom tooltip" position="bottom">
+              Bottom
+            </button>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <!-- LEFT EDGE -->
-      <section class="edge-case left-edge">
-        <span class="label left-label">Left edge (position="left"):</span>
-        <button brnTooltip="I should flip to right" position="left">
-          Hover
-        </button>
-      </section>
-
-      <!-- RIGHT EDGE -->
-      <section class="edge-case right-edge">
-        <span class="label right-label">Right edge (position="right"):</span>
-        <button brnTooltip="I should flip to left" position="right">
-          Hover
-        </button>
-      </section>
-
-      <!-- CENTER: works fine (enough space) -->
-      <section class="edge-case center">
-        <span class="label"
-          >Center (enough space) — works correctly in all positions:</span
-        >
-        <div class="button-row center-row">
-          <button brnTooltip="Top tooltip — enough space" position="top">
-            Top
-          </button>
-          <button brnTooltip="Bottom tooltip — enough space" position="bottom">
-            Bottom
-          </button>
-          <button brnTooltip="Left tooltip — enough space" position="left">
-            Left
-          </button>
-          <button brnTooltip="Right tooltip — enough space" position="right">
-            Right
-          </button>
+      <!-- AFTER: fixed tooltip with fallback positions -->
+      <div class="panel after">
+        <div class="panel-header">
+          <h2>After (PR #1316 fix)</h2>
+          <p>
+            Fallback positions + arrow update on flip. Tooltip stays in
+            viewport.
+          </p>
         </div>
-      </section>
+        <div class="panel-body">
+          <div class="edge top-edge">
+            <button fixedTooltip="I auto-flip to bottom!" position="top">
+              Hover me (top)
+            </button>
+          </div>
+          <div class="edge bottom-edge">
+            <button fixedTooltip="I auto-flip to top!" position="bottom">
+              Hover me (bottom)
+            </button>
+          </div>
+          <div class="edge left-edge">
+            <button fixedTooltip="I auto-flip to right!" position="left">
+              Left
+            </button>
+          </div>
+          <div class="edge right-edge">
+            <button fixedTooltip="I auto-flip to left!" position="right">
+              Right
+            </button>
+          </div>
+          <div class="center-buttons">
+            <span class="hint">Center (still works):</span>
+            <button fixedTooltip="Top tooltip" position="top">Top</button>
+            <button fixedTooltip="Bottom tooltip" position="bottom">
+              Bottom
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `,
 })

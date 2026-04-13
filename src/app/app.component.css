@@ -1,40 +1,55 @@
-.demo {
-  min-height: 100vh;
+.layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   position: relative;
 }
 
-h2 {
+.panel.before {
+  border-right: 2px solid #e4e4e7;
+}
+
+.panel-header {
   text-align: center;
-  padding: 60px 20px 8px;
-  font-size: 20px;
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #e4e4e7;
+  z-index: 10;
+}
+
+.panel.before .panel-header {
+  border-bottom-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.panel.after .panel-header {
+  border-bottom-color: #86efac;
+  background: #f0fdf4;
+}
+
+.panel-header h2 {
+  font-size: 16px;
+  font-weight: 600;
   color: #18181b;
+  margin: 0 0 4px;
 }
 
-.description {
-  text-align: center;
-  padding: 0 20px 20px;
+.panel-header p {
+  font-size: 12px;
   color: #71717a;
-  font-size: 14px;
-  max-width: 600px;
-  margin: 0 auto;
+  margin: 0;
 }
 
-code {
-  background: #e4e4e7;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.edge-case {
-  position: absolute;
-}
-
-.label {
-  display: block;
-  font-size: 11px;
-  color: #a1a1aa;
-  margin-bottom: 6px;
+.panel-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 button {
@@ -45,31 +60,29 @@ button {
   cursor: pointer;
   font-size: 13px;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 
 button:hover {
   background: #f4f4f5;
 }
 
-.button-row {
-  display: flex;
-  gap: 8px;
+.edge {
+  position: absolute;
 }
 
 .top-edge {
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 16px;
-  text-align: center;
+  padding: 4px;
 }
 
 .bottom-edge {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 16px;
-  text-align: center;
+  padding: 4px;
 }
 
 .left-edge {
@@ -79,34 +92,25 @@ button:hover {
   padding: 4px;
 }
 
-.left-label {
-  writing-mode: vertical-lr;
-  transform: rotate(180deg);
-  margin-bottom: 0;
-  margin-right: 4px;
-}
-
 .right-edge {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
   padding: 4px;
-  text-align: right;
 }
 
-.right-label {
-  writing-mode: vertical-lr;
-  margin-bottom: 0;
-  margin-left: auto;
-}
-
-.center {
+.center-buttons {
+  position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.center-row {
-  justify-content: center;
+.hint {
+  font-size: 11px;
+  color: #a1a1aa;
 }

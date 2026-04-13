@@ -1,0 +1,2 @@
+[14:58:15] cd /private/tmp/claude/spartan-tooltip-demo && git init && git add -A && git commit -m "demo: BrnTooltip viewport edge clipping reproduction" 2>&1
+[14:58:23] gh repo create Musta-Pollo/spartan-tooltip-viewport-demo --public --source=. --push --description "Demo: BrnTooltip clips off-screen at viewport edges (no fallback positions)" 2>&1
